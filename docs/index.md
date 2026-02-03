@@ -26,3 +26,20 @@ and serves them — automatically. You write the docs. Everything else is handle
 - Write your documentation for you.
 - Make bad documentation good.
 - Pretend that "we'll document it later" is a viable strategy.
+
+---
+
+## Philosophy
+
+Underlying philosophy justifying yet another doc manager
+
+- [Centralize](./philosophy/centralized-documentation.md)
+- [Stay close](./philosophy/docs-close-to-code.md)
+- [Version](./philosophy/git-versioned-docs.md)
+- [Technical only](./philosophy/technical-vs-commercial.md)
+
+Oh and last justification, don't need an entire explanation as it's pure logic:
+
+- it's free
+- you deploy it on your own
+- not my business do your thing idc
