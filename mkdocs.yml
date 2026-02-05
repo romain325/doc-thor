@@ -9,6 +9,7 @@ nav:
   - Technical: technical.md
   - Diagrams: diagrams.md
   - Deployment: deployment.md
+  - Builder Images: builder-images.md
   - Decisions:
       - Builder Job Delivery: decisions/adr-001-builder-job-delivery.md
   - Philosophy:
