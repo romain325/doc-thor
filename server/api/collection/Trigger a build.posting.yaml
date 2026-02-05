@@ -1,0 +1,8 @@
+name: Trigger a build
+method: POST
+url: ${BASE_URL}/projects/{slug}/builds
+body:
+  content: |-
+    {
+      "ref": ""
+    }

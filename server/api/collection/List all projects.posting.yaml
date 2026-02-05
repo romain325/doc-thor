@@ -1,0 +1,2 @@
+name: List all projects
+url: ${BASE_URL}/projects

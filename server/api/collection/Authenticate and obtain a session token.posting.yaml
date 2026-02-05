@@ -1,0 +1,13 @@
+name: Authenticate and obtain a session token
+method: POST
+url: ${BASE_URL}/auth/login
+body:
+  content: |-
+    {
+      "username": "admin",
+      "password": "admin"
+    }
+  content_type: application/json
+headers:
+- name: content-type
+  value: application/json

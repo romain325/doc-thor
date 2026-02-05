@@ -1,0 +1,15 @@
+name: Create a project
+method: POST
+url: ${BASE_URL}/projects
+body:
+  content: |-
+    {
+      "slug": "test",
+      "name": "test",
+      "source_url": "ssh://git@sources.ops.ciril.lan:2222/smart/intranet/stock.git",
+      "docker_image": "doc-thor/builder-mkdocs"
+    }
+  content_type: application/json
+headers:
+- name: content-type
+  value: application/json

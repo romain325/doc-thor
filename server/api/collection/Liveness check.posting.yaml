@@ -1,0 +1,2 @@
+name: Liveness check
+url: ${BASE_URL}/health

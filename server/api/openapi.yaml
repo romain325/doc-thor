@@ -1,0 +1,765 @@
+openapi: 3.1.0
+info:
+  title: doc-thor server API
+  description: >
+    Core API for doc-thor. Manages documentation projects, build jobs,
+    published versions, authentication, and backend discovery.
+  version: 1.0.0
+
+servers:
+  - url: /api/v1
+
+# ---------------------------------------------------------------------------
+# Security
+# ---------------------------------------------------------------------------
+# All endpoints except GET /health and POST /auth/login require a Bearer
+# token.  The token is either a session token (returned by /auth/login) or
+# an API key (created via POST /auth/apikey).  Both are validated the same
+# way; only the raw value is ever sent over the wire — the server stores
+# only its SHA-256 hash.
+# ---------------------------------------------------------------------------
+security:
+  - bearerToken: []
+
+components:
+  securitySchemes:
+    bearerToken:
+      type: http
+      scheme: bearer
+      description: Session token from POST /auth/login or an API key from POST /auth/apikey.
+
+  # -----------------------------------------------------------------
+  # Reusable schemas
+  # -----------------------------------------------------------------
+  schemas:
+    # --- common ---
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          example: project not found
+
+    # --- Project ---
+    Project:
+      type: object
+      required:
+        - id
+        - slug
+        - name
+        - source_url
+        - docker_image
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: uint
+        slug:
+          type: string
+        name:
+          type: string
+        source_url:
+          type: string
+        docker_image:
+          type: string
+          description: >
+            Docker image the builder will run for this project.  The image
+            must follow the builder contract: source repo is mounted
+            read-only at /repo, generated output must be written to /output.
+          example: doc-thor/builder-mkdocs
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ProjectCreate:
+      type: object
+      required:
+        - slug
+        - name
+        - source_url
+        - docker_image
+      properties:
+        slug:
+          type: string
+          example: my-docs
+        name:
+          type: string
+          example: My Documentation
+        source_url:
+          type: string
+          example: https://github.com/org/my-docs.git
+        docker_image:
+          type: string
+          example: doc-thor/builder-mkdocs
+
+    ProjectUpdate:
+      description: >
+        All fields are optional.  Only fields that are present and
+        non-empty are applied.  Omit a field to leave it unchanged.
+      type: object
+      properties:
+        name:
+          type: string
+        source_url:
+          type: string
+        docker_image:
+          type: string
+
+    # --- Build ---
+    Build:
+      type: object
+      required:
+        - id
+        - project_id
+        - status
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: uint
+        project_id:
+          type: integer
+          format: uint
+        ref:
+          type: string
+          description: Git ref that was built. Empty string when the builder uses the default branch.
+        status:
+          type: string
+          enum: [pending, running, success, failed]
+        logs:
+          type: string
+          description: Accumulated build log output.  Present only when non-empty.
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    BuildCreate:
+      type: object
+      properties:
+        ref:
+          type: string
+          description: >
+            Git ref (branch, tag, or SHA) to build.  Omit or send an
+            empty body to build the repository's default branch.
+          example: main
+
+    # --- Version ---
+    Version:
+      type: object
+      required:
+        - id
+        - project_id
+        - build_id
+        - version
+        - published
+        - is_latest
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: uint
+        project_id:
+          type: integer
+          format: uint
+        build_id:
+          type: integer
+          format: uint
+        version:
+          type: string
+          description: The version tag (maps to the URL-visible version segment).
+        published:
+          type: boolean
+        is_latest:
+          type: boolean
+          description: >
+            When true this version is served at the bare subdomain
+            (without a version segment).  At most one version per
+            project may be latest; setting it here clears the flag
+            on any previous latest.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    VersionUpdate:
+      type: object
+      description: >
+        At least one field must be provided; an empty body returns 400.
+      properties:
+        published:
+          type: boolean
+        is_latest:
+          type: boolean
+
+    # --- Auth ---
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          example: admin
+        password:
+          type: string
+          format: password
+          example: s3cret
+
+    LoginResponse:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          description: Opaque session token.  Use as a Bearer value.
+
+    APIKeyCreate:
+      type: object
+      properties:
+        label:
+          type: string
+          description: Human-readable label for the key.
+          example: ci-pipeline
+
+    APIKeyResponse:
+      type: object
+      required:
+        - key
+        - label
+      properties:
+        key:
+          type: string
+          description: >
+            Raw API key.  Only returned once at creation time.
+            The server never stores or exposes this value again.
+        label:
+          type: string
+
+    User:
+      type: object
+      required:
+        - id
+        - username
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          format: uint
+        username:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # --- Discovery ---
+    BackendStatus:
+      type: object
+      required:
+        - name
+        - url
+        - healthy
+        - last_check
+      properties:
+        name:
+          type: string
+          enum: [builder, storage]
+        url:
+          type: string
+        healthy:
+          type: boolean
+        last_check:
+          type: string
+          format: date-time
+
+  # -----------------------------------------------------------------
+  # Reusable responses
+  # -----------------------------------------------------------------
+  responses:
+    Unauthorized:
+      description: Missing or invalid Bearer token.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: unauthorized
+
+    NotFound:
+      description: The requested resource does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    BadRequest:
+      description: Malformed or invalid request.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    InternalError:
+      description: Unexpected server error.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: database error
+
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+paths:
+  # -----------------------------------------------------------------------
+  # Health
+  # -----------------------------------------------------------------------
+  /health:
+    get:
+      summary: Liveness check
+      operationId: health
+      security: []   # public
+      responses:
+        "200":
+          description: Server is running.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+              example:
+                status: ok
+
+  # -----------------------------------------------------------------------
+  # Auth
+  # -----------------------------------------------------------------------
+  /auth/login:
+    post:
+      summary: Authenticate and obtain a session token
+      operationId: login
+      security: []   # public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Credentials accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: Invalid username or password.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: invalid credentials
+
+  /auth/apikey:
+    post:
+      summary: Create an API key
+      operationId: createAPIKey
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/APIKeyCreate"
+      responses:
+        "201":
+          description: Key created.  The raw key is included only in this response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIKeyResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /auth/me:
+    get:
+      summary: Return the authenticated user
+      operationId: getMe
+      responses:
+        "200":
+          description: Current user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # -----------------------------------------------------------------------
+  # Projects
+  # -----------------------------------------------------------------------
+  /projects:
+    post:
+      summary: Create a project
+      operationId: createProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectCreate"
+      responses:
+        "201":
+          description: Project created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "400":
+          description: Missing required field (slug, name, source_url, or docker_image).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: slug, name, source_url, and docker_image are required
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: A project with this slug already exists.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: project with this slug already exists
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    get:
+      summary: List all projects
+      operationId: listProjects
+      responses:
+        "200":
+          description: Array of projects (may be empty).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /projects/{slug}:
+    parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Unique project identifier.
+
+    get:
+      summary: Get a single project
+      operationId: getProject
+      responses:
+        "200":
+          description: The requested project.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    put:
+      summary: Update a project
+      operationId: updateProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectUpdate"
+      responses:
+        "200":
+          description: Updated project.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    delete:
+      summary: Delete a project and all its builds and versions
+      operationId: deleteProject
+      responses:
+        "204":
+          description: Project deleted. No content returned.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # -----------------------------------------------------------------------
+  # Builds
+  # -----------------------------------------------------------------------
+  /projects/{slug}/builds:
+    parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+
+    post:
+      summary: Trigger a build
+      operationId: createBuild
+      requestBody:
+        required: false
+        description: Body may be omitted entirely to build the default branch.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BuildCreate"
+      responses:
+        "201":
+          description: Build job created with status `pending`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Build"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Project not found.
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    get:
+      summary: List builds for a project
+      operationId: listBuilds
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+          description: Maximum number of builds to return.
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description: Number of builds to skip (for pagination).
+      responses:
+        "200":
+          description: Builds ordered by created_at descending.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Build"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /projects/{slug}/builds/{id}:
+    parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: uint
+        description: Build ID.
+
+    get:
+      summary: Get a single build
+      operationId: getBuild
+      responses:
+        "200":
+          description: The requested build, including logs if available.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Build"
+        "400":
+          description: The build id path segment is not a valid integer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: invalid build id
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # -----------------------------------------------------------------------
+  # Versions
+  # -----------------------------------------------------------------------
+  /projects/{slug}/versions:
+    parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+
+    get:
+      summary: List versions for a project
+      operationId: listVersions
+      responses:
+        "200":
+          description: All versions for the project (published and unpublished).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Version"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /projects/{slug}/versions/{ver}:
+    parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: ver
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Version tag.
+
+    put:
+      summary: Update version metadata
+      description: >
+        Publish, unpublish, or promote a version to latest.
+        After a successful update the server performs a best-effort
+        sync of the Nginx routing configuration; that sync failure
+        does not cause this request to fail.
+      operationId: updateVersion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VersionUpdate"
+      responses:
+        "200":
+          description: Updated version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Version"
+        "400":
+          description: Body is missing or contains no recognised fields.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: nothing to update
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # -----------------------------------------------------------------------
+  # System / Discovery
+  # -----------------------------------------------------------------------
+  /backends:
+    get:
+      summary: Discovered backend services and their health
+      description: >
+        Returns one entry per configured builder endpoint plus one
+        entry for the storage backend.  Each entry reflects
+        the result of the most recent health-check ping performed
+        during this request.
+      operationId: getBackends
+      responses:
+        "200":
+          description: Backend statuses.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BackendStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"

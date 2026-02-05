@@ -1,0 +1,4 @@
+name: Discovered backend services and their health
+description: |-
+  Returns one entry per configured builder endpoint plus one entry for the storage backend.  Each entry reflects the result of the most recent health-check ping performed during this request.
+url: ${BASE_URL}/backends

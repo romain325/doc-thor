@@ -1,0 +1,11 @@
+name: Update version metadata
+description: |-
+  Publish, unpublish, or promote a version to latest. After a successful update the server performs a best-effort sync of the Nginx routing configuration; that sync failure does not cause this request to fail.
+method: PUT
+url: ${BASE_URL}/projects/{slug}/versions/{ver}
+body:
+  content: |-
+    {
+      "published": false,
+      "is_latest": false
+    }

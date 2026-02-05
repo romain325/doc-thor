@@ -1,0 +1,2 @@
+name: Return the authenticated user
+url: ${BASE_URL}/auth/me

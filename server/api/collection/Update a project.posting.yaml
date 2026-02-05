@@ -1,0 +1,10 @@
+name: Update a project
+method: PUT
+url: ${BASE_URL}/projects/{slug}
+body:
+  content: |-
+    {
+      "name": "",
+      "source_url": "",
+      "docker_image": ""
+    }

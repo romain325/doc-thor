@@ -1,0 +1,7 @@
+name: List builds for a project
+url: ${BASE_URL}/projects/{slug}/builds
+params:
+- name: limit
+  value: ''
+- name: offset
+  value: ''

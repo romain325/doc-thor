@@ -1,0 +1,8 @@
+name: Create an API key
+method: POST
+url: ${BASE_URL}/auth/apikey
+body:
+  content: |-
+    {
+      "label": ""
+    }

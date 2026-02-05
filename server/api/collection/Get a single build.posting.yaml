@@ -1,0 +1,2 @@
+name: Get a single build
+url: ${BASE_URL}/projects/{slug}/builds/{id}

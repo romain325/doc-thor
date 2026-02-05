@@ -1,0 +1,6 @@
+[tools]
+"pipx:posting" = "latest"
+
+
+[tasks.api-client]
+run = "posting -c api/collection -e api/dev.env"
