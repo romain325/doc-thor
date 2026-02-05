@@ -12,6 +12,12 @@ made to "just work"
 
 be patient.
 
+```shell
+# Up ssh agent for builder repo pull
+eval $(ssh-agent -s)
+ssh-add ~/.ssh/id_ed25519
+```
+
 ## Philosophy and initial input
 
 No server online atm so available [here](./docs/index.md)
