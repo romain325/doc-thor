@@ -1,0 +1,25 @@
+# Auto-generated — do not edit.  Project: {{ project.slug }}
+
+{% for version in project.versions -%}
+server {
+    listen 80;
+{% if version == project.latest %}
+    # Bare subdomain (latest) and pinned version share this block.
+    server_name {{ project.slug }}.{{ base_domain }}
+                {{ project.slug }}-{{ version }}.{{ base_domain }};
+{% else %}
+    server_name {{ project.slug }}-{{ version }}.{{ base_domain }};
+{% endif %}
+    set $doc_project "{{ project.slug }}";
+    set $doc_version "{{ version }}";
+
+    location / {
+        proxy_pass        {{ storage_url }}/{{ project.slug }}/{{ version }}/;
+        proxy_set_header  Host              {{ storage_bucket }}.web.garage;
+        proxy_set_header  X-Real-IP         $remote_addr;
+        proxy_set_header  X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header  X-Forwarded-Proto $scheme;
+    }
+}
+
+{% endfor %}

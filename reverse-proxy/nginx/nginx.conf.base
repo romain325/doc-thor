@@ -1,0 +1,47 @@
+worker_processes auto;
+
+error_log /var/log/nginx/error.log warn;
+pid      /var/run/nginx.pid;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" '
+                    '"$http_user_agent" "$http_x_forwarded_for"';
+
+    # Structured JSON log — tailed by the OTel Collector.
+    # $doc_project / $doc_version are set per-server-block via `set`.
+    # escape=json keeps user-agent and URIs safe inside the JSON string.
+    log_format json_access escape=json '{'
+        '"ts":"$time_iso8601",'
+        '"remote_addr":"$remote_addr",'
+        '"method":"$request_method",'
+        '"uri":"$request_uri",'
+        '"status":$status,'
+        '"body_size":$body_bytes_sent,'
+        '"request_time":$request_time,'
+        '"host":"$host",'
+        '"project":"$doc_project",'
+        '"version":"$doc_version",'
+        '"referer":"$http_referer",'
+        '"user_agent":"$http_user_agent"'
+        '}';
+
+    access_log  /var/log/nginx/access.log      main;
+    access_log  /var/log/nginx/access.json     json_access;
+
+    sendfile       on;
+    tcp_nopush     on;
+    keepalive_timeout  65;
+
+    # Dynamically generated server blocks live here.
+    # 00-default.conf  – webapp on the bare domain (written by entrypoint).
+    # <slug>.conf      – one file per project (written by config-gen or server).
+    include /etc/nginx/conf.d/*.conf;
+}

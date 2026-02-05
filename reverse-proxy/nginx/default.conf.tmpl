@@ -1,0 +1,16 @@
+# Catch-all for the bare base domain.  No web UI yet — return 503 until one
+# is wired up.  Processed by envsubst at container start; only ${BASE_DOMAIN}
+# is substituted.  Bare nginx variables ($host, etc.) are left untouched.
+
+server {
+    listen 80 default_server;
+    server_name ${BASE_DOMAIN};
+
+    # Not a doc project — leave telemetry fields empty.
+    set $doc_project "";
+    set $doc_version "";
+
+    location / {
+        return 503;
+    }
+}
