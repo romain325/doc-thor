@@ -1,0 +1,10 @@
+Pygments
+pymdown_extensions
+mkdocs
+mkdocs-awesome-pages-plugin
+mkdocs-material
+Jinja2
+MarkupSafe
+packaging
+mkdocs-windmill
+mkdocs-mermaid2-plugin
