@@ -1,0 +1,8 @@
+[tools]
+go = "latest"
+python = "latest"
+uv = "latest"
+
+
+[tasks.docs-build]
+run = "uv run mkdocs build"

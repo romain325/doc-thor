@@ -1,0 +1,29 @@
+site_name: doc-thor
+site_description: Automated technical documentation generation and versioned publishing.
+repo_url: https://github.com/romain325/doc-thor
+repo_name: romain325/doc-thor
+nav:
+  - Home: index.md
+  - Features: features.md
+  - Architecture: architecture.md
+  - Technical: technical.md
+  - Diagrams: diagrams.md
+  - Deployment: deployment.md
+  - Decisions:
+      - Builder Job Delivery: decisions/adr-001-builder-job-delivery.md
+  - Philosophy:
+      - Centralized Documentation: philosophy/centralized-documentation.md
+      - Docs Close to Code: philosophy/docs-close-to-code.md
+      - Git-Versioned Docs: philosophy/git-versioned-docs.md
+      - Technical vs Commercial: philosophy/technical-vs-commercial.md
+plugins:
+  - mermaid2
+  - search
+theme:
+  name: material
+  palette:
+    scheme: slate
+    primary: deep purple
+  font:
+    text: Google Sans Code
+    code: Google Sans Code
