@@ -1,0 +1,67 @@
+# =============================================================================
+# OpenTelemetry Collector — log ingestion for reverse-proxy access logs.
+#
+# Pipeline:
+#   filelog (tail access.json)
+#     → json_parser         parse body, keep original JSON as body
+#     → move project/version into attributes (become Loki stream labels)
+#     → add job attribute
+#     → lokiexporter        push to Loki
+#
+# The original JSON string is preserved as the log body so that Grafana
+# can re-parse every field with LogQL `| json` without information loss.
+# =============================================================================
+
+extensions:
+  # Persist the last-read byte offset so logs are not re-ingested on restart.
+  file_storage:
+    directory: /var/log/otel/state
+
+receivers:
+  filelog:
+    include:
+      - /var/log/nginx/access.json
+    storage: file_storage
+    operators:
+      # 1. Parse JSON body.  preserve_original_record keeps the raw string
+      #    in attributes.original_record so we can restore it later.
+      - type: json_parser
+        preserve_original_record: true
+        on_error: drop
+
+      # 2. Promote project & version from the parsed map into attributes.
+      #    These become Loki stream labels (indexed, fast to filter).
+      - type: move
+        from: body.project
+        to: attributes.project
+      - type: move
+        from: body.version
+        to: attributes.version
+
+      # 3. Restore the original JSON string as the body.
+      #    Grafana will re-parse it with `| json` at query time.
+      - type: move
+        from: attributes.original_record
+        to: body
+
+      # 4. Stamp every log entry with a static job label.
+      - type: add_attributes
+        attributes:
+          job: reverse-proxy
+
+exporters:
+  loki:
+    endpoint: http://loki:3100/loki/api/v1/push
+    # These attribute keys are extracted and used as Loki stream labels.
+    # Everything else stays in the body.
+    labels:
+      - job
+      - project
+      - version
+
+service:
+  extensions: [file_storage]
+  pipelines:
+    logs:
+      receivers:  [filelog]
+      exporters: [loki]

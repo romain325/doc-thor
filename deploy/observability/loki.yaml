@@ -1,0 +1,42 @@
+# =============================================================================
+# Loki — single-node configuration.
+# Started with  -target=all  (see docker-compose.yml).
+# Retention: 7 days.  All state lives under /loki (mapped to a named volume).
+# =============================================================================
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9095
+
+auth_enabled: false
+
+common:
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory:  /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+    instance_addr: 127.0.0.1
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: boltdb_shipper
+      object_store: filesystem
+      schema: v13
+      index_config:
+        shared_store: filesystem
+
+storage_config:
+  boltdb_shipper:
+    active_persist_dir: /loki/index
+    shared_store: filesystem
+  filesystem:
+    directory: /loki/chunks
+
+limits_config:
+  retention_period: 168h    # 7 days

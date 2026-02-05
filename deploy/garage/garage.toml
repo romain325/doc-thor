@@ -1,0 +1,42 @@
+# =============================================================================
+# doc-thor — Garage config (single-node, local dev)
+# =============================================================================
+# Garage is the S3-compatible object store for doc-thor.
+# This config targets a single-node development setup.
+#
+# Before first use, run inside the container:
+#   garage status                                   # grab <node-id>
+#   garage layout assign -z dc1 -c 1T <node-id>
+#   garage layout apply --version 1
+#   garage key create doc-thor-key                  # note Key ID + Secret Key → .env
+#   garage bucket create doc-thor-docs
+#   garage bucket allow doc-thor-docs --read --write --key doc-thor-key
+#
+# For production: set real secrets, switch db_engine to lmdb, increase replication_factor.
+# =============================================================================
+
+metadata_dir = "/var/lib/garage/meta"
+data_dir     = "/var/lib/garage/data"
+db_engine    = "sqlite"
+
+replication_factor = 1
+
+rpc_bind_addr   = "[::]:3901"
+rpc_public_addr = "127.0.0.1:3901"
+rpc_secret      = "eb6ee09d3fe4465e3aff0167f5a66b4dde7a0c5d1446a4055e1bf44781cac672"
+# openssl rand -hex 32
+
+[s3_api]
+s3_region     = "garage"
+api_bind_addr = "[::]:3900"
+root_domain   = ".s3.garage"
+
+[s3_web]
+bind_addr   = "[::]:3902"
+root_domain = ".web.garage"
+index       = "index.html"
+
+[admin]
+api_bind_addr = "0.0.0.0:3903"
+admin_token   = "ZIQAbdx/CTA8BwWCkJe9P4q+Ii2tlG2VqV0llHXz35M="
+# openssl rand -base64 32

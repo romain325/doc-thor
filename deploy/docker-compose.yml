@@ -1,0 +1,136 @@
+# =============================================================================
+# doc-thor — Docker Compose Stack
+# =============================================================================
+# Skeleton configuration.
+# Services reference Dockerfiles that don't exist yet.
+# This file defines the intended topology, networking, and env wiring.
+# Update as each module is implemented.
+#
+# Usage:
+#   docker compose --env-file env/.env up -d
+# =============================================================================
+services:
+  # ---------------------------------------------------------------------------
+  # Reverse Proxy
+  # Entry point for all external traffic. Subdomain routing to versioned docs.
+  # ---------------------------------------------------------------------------
+  nginx:
+    build:
+      context: ../reverse-proxy
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    depends_on:
+      - server
+      - garage
+    networks:
+      - doc-thor-net
+    environment:
+      BASE_DOMAIN: ${BASE_DOMAIN:-localhost}
+      SERVER_URL: http://server:8080/api/v1
+      NGINX_TOKEN: ${NGINX_TOKEN}
+      STORAGE_URL: http://garage:3902
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-doc-thor-docs}
+      POLL_INTERVAL: ${NGINX_POLL_INTERVAL:-10}
+    volumes:
+      - nginx-config:/etc/nginx/conf.d # Server writes routing config here
+      - nginx-certs:/etc/nginx/certs # TLS certs (mounted or certbot-managed)
+      - nginx-logs:/var/log/nginx # Shared with otel-collector (observability)
+    restart: unless-stopped
+  # ---------------------------------------------------------------------------
+  # Storage
+  # Garage — S3-compatible object storage. All built docs land here.
+  # ---------------------------------------------------------------------------
+  garage:
+    build:
+      context: ../storage
+    volumes:
+      - ./garage/garage.toml:/etc/garage.toml
+      - garage-data:/var/lib/garage
+    networks:
+      - doc-thor-net
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/garage", "status"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+  # ---------------------------------------------------------------------------
+  # Server
+  # Core API. Project registry, build jobs, versions, auth.
+  # Writes Nginx routing config to the shared volume on publish events.
+  # ---------------------------------------------------------------------------
+  server:
+    build:
+      context: ../server
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-./data/db.sqlite3}
+      STORAGE_ENDPOINT: http://garage:3900
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-doc-thor-docs}
+      NGINX_CONFIG_DIR: /shared/nginx-conf.d
+      BASE_DOMAIN: ${BASE_DOMAIN:-localhost}
+      INITIAL_USER: ${INITIAL_USER:-admin}
+      INITIAL_PASSWORD: ${INITIAL_PASSWORD:-admin}
+    ports:
+      - "8080:8080"
+    depends_on:
+      garage:
+        condition: service_healthy
+    volumes:
+      - nginx-config:/shared/nginx-conf.d # Writes Nginx server blocks here
+      - server-data:/app/data # Persistent DB
+    networks:
+      - doc-thor-net
+    restart: unless-stopped
+  # ---------------------------------------------------------------------------
+  # Builder
+  # Build agent(s). Polls server for pending jobs, runs the pipeline, uploads.
+  # Scale this service for parallel builds.
+  # ---------------------------------------------------------------------------
+  builder:
+    build:
+      context: ../builder
+    environment:
+      SERVER_URL: http://server:8080
+      STORAGE_ENDPOINT: http://garage:3900
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-doc-thor-docs}
+      STORAGE_REGION: garage
+      POLL_INTERVAL: ${BUILDER_POLL_INTERVAL:-5}
+      BUILDER_TOKEN: ${BUILDER_TOKEN}
+      SSH_AUTH_SOCK: /ssh-agent.sock
+      WORKSPACE_DIR: /tmp/doc-thor-builds
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /tmp/doc-thor-builds:/tmp/doc-thor-builds
+      - ${SSH_AUTH_SOCK}:/ssh-agent.sock
+      - ${HOME}/.ssh/known_hosts:/root/.ssh/known_hosts:ro
+    depends_on:
+      - server
+      - garage
+    networks:
+      - doc-thor-net
+    deploy:
+      replicas: ${BUILDER_REPLICAS:-1}
+    restart: unless-stopped
+# ---------------------------------------------------------------------------
+# Networking
+# Single internal network. Only nginx exposes external ports.
+# ---------------------------------------------------------------------------
+networks:
+  doc-thor-net:
+    driver: bridge
+# ---------------------------------------------------------------------------
+# Volumes
+# garage-data and server-data are persistent state. Back them up.
+# nginx-config is a shared runtime volume (ephemeral content, regenerated).
+# ---------------------------------------------------------------------------
+volumes:
+  garage-data:
+  server-data:
+  nginx-config:
+  nginx-certs:
+  nginx-logs: # Tailed by otel-collector; see observability/

@@ -1,0 +1,88 @@
+# =============================================================================
+# doc-thor — Observability stack
+# =============================================================================
+# OTel Collector  →  Loki  →  Grafana
+#
+# Usage (from the deploy/ directory — both files must share one invocation so
+# that the nginx-logs volume and doc-thor-net network resolve to the same
+# objects defined in the main compose):
+#
+#   docker compose --env-file env/.env \
+#     -f docker-compose.yml \
+#     -f observability/docker-compose.yml \
+#     up -d
+#
+# Grafana is then available at  http://localhost:${GRAFANA_PORT:-3000}
+# The "Doc-Thor — Docs Usage" dashboard is provisioned automatically.
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # OpenTelemetry Collector
+  # Tails the Nginx JSON access log, extracts project/version as Loki stream
+  # labels, and pushes to Loki.  Checkpoint state is persisted so that a
+  # collector restart does not re-ingest old entries.
+  # ---------------------------------------------------------------------------
+  otel-collector:
+    image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.115.0
+    command: ["--config", "/etc/otel/config.yaml"]
+    volumes:
+      - nginx-logs:/var/log/nginx:ro              # access.json written by nginx
+      - otel-state:/var/log/otel/state            # filelog read-offset checkpoint
+      - ./otel-collector.yaml:/etc/otel/config.yaml:ro
+    networks:
+      - doc-thor-net
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Loki — single-node log store.  7-day retention.
+  # All state is under /loki (mapped to the loki-data volume).
+  # ---------------------------------------------------------------------------
+  loki:
+    image: grafana/loki:3.3.0
+    command: ["-config.file=/etc/loki/loki.yaml", "-target=all"]
+    volumes:
+      - loki-data:/loki
+      - ./loki.yaml:/etc/loki/loki.yaml:ro
+    networks:
+      - doc-thor-net
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Grafana — dashboards.
+  # Datasource (Loki) and the docs-usage dashboard are auto-provisioned on
+  # first start; no manual setup needed.
+  # ---------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:11.3.0
+    volumes:
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/dashboards/provisioning.yaml:/etc/grafana/provisioning/dashboards/doc-thor.yaml:ro
+      - ./grafana/dashboards/docs-usage.json:/var/lib/grafana/dashboards/docs-usage.json:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    networks:
+      - doc-thor-net
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+# ---------------------------------------------------------------------------
+# Volumes
+# nginx-logs is created by the main docker-compose.yml.  Both files must be
+# passed to the same docker-compose invocation (see Usage above).
+# ---------------------------------------------------------------------------
+volumes:
+  nginx-logs:       # shared with the nginx service in the main compose
+  otel-state:       # collector checkpoint — survives restarts
+  loki-data:        # Loki chunks + index — persistent, back it up
+  grafana-data:     # Grafana user state
+
+# ---------------------------------------------------------------------------
+# Network — reuses the one defined in the main compose.
+# ---------------------------------------------------------------------------
+networks:
+  doc-thor-net:
