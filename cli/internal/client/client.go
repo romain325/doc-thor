@@ -28,6 +28,11 @@ func New(baseURL, token string) *Client {
 	}
 }
 
+// BaseURL returns the base URL configured for this client.
+func (c *Client) BaseURL() string {
+	return c.baseURL
+}
+
 // APIError is returned whenever the server responds with HTTP >= 400.
 type APIError struct {
 	StatusCode int
@@ -290,5 +295,132 @@ func (c *Client) ListVersions(slug string) ([]Version, error) {
 func (c *Client) UpdateVersion(slug, ver string, req VersionUpdate) (Version, error) {
 	var v Version
 	err := c.decode("PUT", "/projects/"+slug+"/versions/"+ver, req, &v)
+	return v, err
+}
+
+// ---------------------------------------------------------------------------
+// VCS Integrations
+// ---------------------------------------------------------------------------
+
+type VCSIntegration struct {
+	ID            uint   `json:"id"`
+	Name          string `json:"name"`
+	Provider      string `json:"provider"`
+	InstanceURL   string `json:"instance_url"`
+	Enabled       bool   `json:"enabled"`
+	CreatedAt     string `json:"created_at"`
+	UpdatedAt     string `json:"updated_at"`
+}
+
+type VCSIntegrationCreate struct {
+	Name          string `json:"name"`
+	Provider      string `json:"provider"`
+	InstanceURL   string `json:"instance_url"`
+	AccessToken   string `json:"access_token"`
+	WebhookSecret string `json:"webhook_secret"`
+	Enabled       bool   `json:"enabled"`
+}
+
+type VCSIntegrationUpdate struct {
+	Provider      string `json:"provider,omitempty"`
+	InstanceURL   string `json:"instance_url,omitempty"`
+	AccessToken   string `json:"access_token,omitempty"`
+	WebhookSecret string `json:"webhook_secret,omitempty"`
+	Enabled       *bool  `json:"enabled,omitempty"`
+}
+
+func (c *Client) ListVCSIntegrations() ([]VCSIntegration, error) {
+	var v []VCSIntegration
+	err := c.decode("GET", "/integrations", nil, &v)
+	return v, err
+}
+
+func (c *Client) CreateVCSIntegration(req VCSIntegrationCreate) (VCSIntegration, error) {
+	var v VCSIntegration
+	err := c.decode("POST", "/integrations", req, &v)
+	return v, err
+}
+
+func (c *Client) GetVCSIntegration(name string) (VCSIntegration, error) {
+	var v VCSIntegration
+	err := c.decode("GET", "/integrations/"+name, nil, &v)
+	return v, err
+}
+
+func (c *Client) UpdateVCSIntegration(name string, req VCSIntegrationUpdate) (VCSIntegration, error) {
+	var v VCSIntegration
+	err := c.decode("PUT", "/integrations/"+name, req, &v)
+	return v, err
+}
+
+func (c *Client) DeleteVCSIntegration(name string) error {
+	return c.decode("DELETE", "/integrations/"+name, nil, nil)
+}
+
+type TestResult struct {
+	Success bool   `json:"success"`
+	Message string `json:"message,omitempty"`
+	Error   string `json:"error,omitempty"`
+}
+
+func (c *Client) TestVCSIntegration(name string) (TestResult, error) {
+	var v TestResult
+	err := c.decode("POST", "/integrations/"+name+"/test", nil, &v)
+	return v, err
+}
+
+// ---------------------------------------------------------------------------
+// Project Discovery
+// ---------------------------------------------------------------------------
+
+type BranchMapping struct {
+	Branch      string `json:"branch"`
+	VersionTag  string `json:"version_tag"`
+	AutoPublish bool   `json:"auto_publish"`
+}
+
+type DocThorConfig struct {
+	Slug           string          `json:"slug"`
+	Name           string          `json:"name"`
+	DockerImage    string          `json:"docker_image"`
+	BranchMappings []BranchMapping `json:"branch_mappings,omitempty"`
+}
+
+type DiscoveredProject struct {
+	Name          string         `json:"name"`
+	Path          string         `json:"path"`
+	CloneURL      string         `json:"clone_url"`
+	DefaultBranch string         `json:"default_branch"`
+	HasDocThor    bool           `json:"has_doc_thor"`
+	DocThorConfig *DocThorConfig `json:"doc_thor_config,omitempty"`
+}
+
+type DiscoveryRequest struct {
+	Scope string `json:"scope"`
+}
+
+type DiscoveryResponse struct {
+	Count    int                 `json:"count"`
+	Projects []DiscoveredProject `json:"projects"`
+}
+
+func (c *Client) DiscoverProjects(integrationName string, req DiscoveryRequest) (DiscoveryResponse, error) {
+	var v DiscoveryResponse
+	err := c.decode("POST", "/integrations/"+integrationName+"/discover", req, &v)
+	return v, err
+}
+
+type ImportProjectRequest struct {
+	IntegrationName   string            `json:"integration_name"`
+	DiscoveredProject DiscoveredProject `json:"discovered_project"`
+	BranchMappings    []BranchMapping   `json:"branch_mappings,omitempty"`
+	AutoPublish       bool              `json:"auto_publish"`
+	RegisterWebhook   bool              `json:"register_webhook"`
+	CallbackURL       string            `json:"callback_url,omitempty"`
+}
+
+func (c *Client) ImportProject(req ImportProjectRequest) (Project, error) {
+	var v Project
+	err := c.decode("POST", "/projects/import", req, &v)
 	return v, err
 }

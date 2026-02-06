@@ -1,0 +1,41 @@
+# yaml-language-server: $schema=./.doc-thor.project.schema.json
+
+# doc-thor Project Configuration
+# This file declares that this repository contains documentation
+# that should be built and published by doc-thor.
+#
+# Schema: .doc-thor.project.schema.json
+
+# Required: URL-safe project identifier
+# Used in subdomain: doc-thor-docs.docs.example.com
+slug: doc-thor-docs
+
+# Required: Human-readable project name
+name: doc-thor Documentation
+
+# Required: Docker image for building docs
+# Must follow builder contract: /repo input, /output result
+# Customize the build process by creating your own builder image
+# (e.g., add plugins, pre-build hooks, custom themes, etc.)
+docker_image: doc-thor/mkdocs-material:latest
+
+# Optional: Default webhook configuration
+# Defines which branches/tags trigger builds
+# Can be customized during project import or later
+branch_mappings:
+  # Build 'latest' version on every push to main
+  - branch: main
+    version_tag: latest
+    auto_publish: true
+
+  # Build versioned docs for every tag matching v*
+  # ${tag} expands to the actual tag name (e.g., v1.2.3 → 1.2.3)
+  - branch: "v*"
+    version_tag: "${tag}"
+    auto_publish: true
+
+  # Build preview docs for development branch
+  # Manual publish required for review
+  - branch: develop
+    version_tag: dev
+    auto_publish: false

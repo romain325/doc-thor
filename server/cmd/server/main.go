@@ -10,11 +10,16 @@ import (
 	"github.com/romain325/doc-thor/server/config"
 	"github.com/romain325/doc-thor/server/models"
 	"github.com/romain325/doc-thor/server/routes"
+	"github.com/romain325/doc-thor/server/vcs"
+	"github.com/romain325/doc-thor/server/vcs/gitlab"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 func main() {
+	// Register VCS providers
+	vcs.RegisterProvider(&gitlab.GitLabProvider{})
+
 	cfg := config.Load()
 
 	db, err := gorm.Open(sqlite.Open(cfg.DatabaseURL), &gorm.Config{})
@@ -33,6 +38,7 @@ func main() {
 		&models.Version{},
 		&models.User{},
 		&models.Token{},
+		&models.VCSIntegration{},
 	); err != nil {
 		log.Fatalf("failed to migrate: %v", err)
 	}
@@ -46,6 +52,9 @@ func main() {
 	// --- public ---
 	r.Get("/api/v1/health", routes.Health())
 	r.Post("/api/v1/auth/login", routes.Login(db, cfg.SessionTTLHours))
+
+	// Webhooks (public - called by VCS platforms)
+	routes.RegisterWebhookRoutes(r, db)
 
 	// --- authenticated ---
 	r.Group(func(r chi.Router) {
@@ -77,6 +86,12 @@ func main() {
 
 		// System
 		r.Get("/api/v1/backends", routes.Backends(cfg.BuilderEndpoints, cfg.StorageEndpoint, cfg.StorageUseSSL))
+
+		// VCS Integrations
+		routes.RegisterVCSIntegrationRoutes(r, db)
+
+		// Project Discovery
+		routes.RegisterDiscoveryRoutes(r, db)
 	})
 
 	log.Printf("doc-thor server listening on :%s", cfg.Port)

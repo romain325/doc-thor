@@ -1,0 +1,107 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://doc-thor.dev/schemas/project-config.json",
+  "title": "doc-thor Project Configuration",
+  "description": "Configuration file for declaring a repository's doc-thor integration",
+  "type": "object",
+  "required": ["slug", "name", "docker_image"],
+  "properties": {
+    "slug": {
+      "type": "string",
+      "description": "URL-safe project identifier used in subdomain and API paths. Must be unique across all projects.",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "minLength": 1,
+      "maxLength": 63,
+      "examples": ["my-api-docs", "user-guide", "admin-docs"]
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable project name displayed in UI",
+      "minLength": 1,
+      "maxLength": 255,
+      "examples": ["My API Documentation", "User Guide", "Admin Documentation"]
+    },
+    "docker_image": {
+      "type": "string",
+      "description": "Docker image used to build the documentation. Must follow builder contract: /repo input mounted read-only, /output result directory. Customize the build process by creating your own builder image.",
+      "pattern": "^[a-z0-9._-]+(/[a-z0-9._-]+)*(:[a-z0-9._-]+)?$",
+      "examples": [
+        "doc-thor/mkdocs-material:latest",
+        "doc-thor/mkdocs:1.5",
+        "myregistry.io/custom-builder:v2"
+      ]
+    },
+    "branch_mappings": {
+      "type": "array",
+      "description": "Default webhook configuration defining which branches/tags trigger builds. Can be customized during project import or later.",
+      "items": {
+        "type": "object",
+        "required": ["branch", "version_tag"],
+        "properties": {
+          "branch": {
+            "type": "string",
+            "description": "Branch or tag pattern to match. Supports glob patterns with *. Examples: 'main', 'v*', 'release/*'",
+            "minLength": 1,
+            "examples": ["main", "develop", "v*", "release/*", "stable"]
+          },
+          "version_tag": {
+            "type": "string",
+            "description": "Target version tag for builds from this branch. Use ${branch} or ${tag} for dynamic substitution.",
+            "minLength": 1,
+            "examples": ["latest", "dev", "${branch}", "${tag}", "stable"]
+          },
+          "auto_publish": {
+            "type": "boolean",
+            "description": "Whether to automatically publish the version after a successful build",
+            "default": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "examples": [
+        [
+          {
+            "branch": "main",
+            "version_tag": "latest",
+            "auto_publish": true
+          },
+          {
+            "branch": "v*",
+            "version_tag": "${tag}",
+            "auto_publish": true
+          }
+        ]
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "slug": "my-api-docs",
+      "name": "My API Documentation",
+      "docker_image": "doc-thor/mkdocs-material:latest"
+    },
+    {
+      "slug": "platform-docs",
+      "name": "Platform Documentation",
+      "docker_image": "mycompany/custom-mkdocs-builder:latest",
+      "branch_mappings": [
+        {
+          "branch": "main",
+          "version_tag": "latest",
+          "auto_publish": true
+        },
+        {
+          "branch": "v*",
+          "version_tag": "${tag}",
+          "auto_publish": true
+        },
+        {
+          "branch": "develop",
+          "version_tag": "dev",
+          "auto_publish": false
+        }
+      ]
+    }
+  ]
+}

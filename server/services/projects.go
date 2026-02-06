@@ -44,7 +44,10 @@ func UpdateProject(db *gorm.DB, slug string, updates *models.Project) (*models.P
 	if updates.SourceURL != "" {
 		p.SourceURL = updates.SourceURL
 	}
-	p.BuildConfig = updates.BuildConfig
+	if updates.DockerImage != "" {
+		p.DockerImage = updates.DockerImage
+	}
+	// VCSConfig is updated via separate VCS integration endpoints
 	if err := db.Save(p).Error; err != nil {
 		return nil, err
 	}
