@@ -13,26 +13,26 @@ type Base struct {
 // Project is a registered documentation source.
 type Project struct {
 	Base
-	Slug        string      `gorm:"uniqueIndex;not null" json:"slug"`
-	Name        string      `gorm:"not null" json:"name"`
-	SourceURL   string      `gorm:"column:source_url;not null" json:"source_url"`
-	DockerImage string      `gorm:"column:docker_image;not null" json:"docker_image"`
-	VCSConfig   *VCSConfig  `gorm:"serializer:json" json:"vcs_config,omitempty"`
+	Slug        string     `gorm:"uniqueIndex;not null" json:"slug"`
+	Name        string     `gorm:"not null" json:"name"`
+	SourceURL   string     `gorm:"column:source_url;not null" json:"source_url"`
+	DockerImage string     `gorm:"column:docker_image;not null" json:"docker_image"`
+	VCSConfig   *VCSConfig `gorm:"serializer:json" json:"vcs_config,omitempty"`
 }
 
 // VCSConfig stores VCS integration settings for a project.
 // Stored as JSON column. Optional - only present if project uses VCS webhooks.
 type VCSConfig struct {
-	IntegrationName string          `json:"integration_name"` // FK to VCSIntegration.Name
+	IntegrationName string          `json:"integration_name"`     // FK to VCSIntegration.Name
 	WebhookID       string          `json:"webhook_id,omitempty"` // Provider-specific webhook ID
-	BranchMappings  []BranchMapping `json:"branch_mappings"` // Which branches/tags trigger builds
-	AutoRegister    bool            `json:"auto_register"` // True if discovered via auto-discovery
+	BranchMappings  []BranchMapping `json:"branch_mappings"`      // Which branches/tags trigger builds
+	AutoRegister    bool            `json:"auto_register"`        // True if discovered via auto-discovery
 }
 
 // BranchMapping defines how a branch/tag pattern maps to a version.
 type BranchMapping struct {
-	Branch      string `yaml:"branch" json:"branch"` // Pattern: "main", "v*", "release/*"
-	VersionTag  string `yaml:"version_tag" json:"version_tag"` // Target version: "latest", "${branch}", "${tag}"
+	Branch      string `yaml:"branch" json:"branch"`             // Pattern: "main", "v*", "release/*"
+	VersionTag  string `yaml:"version_tag" json:"version_tag"`   // Target version: "latest", "${branch}", "${tag}"
 	AutoPublish bool   `yaml:"auto_publish" json:"auto_publish"` // Publish immediately after successful build
 }
 
@@ -40,10 +40,10 @@ type BranchMapping struct {
 type VCSIntegration struct {
 	Base
 	Name          string `gorm:"uniqueIndex;not null" json:"name"` // Unique identifier (e.g., "company-gitlab")
-	Provider      string `gorm:"not null" json:"provider"` // "gitlab" | "github" | "gitea"
-	InstanceURL   string `gorm:"not null" json:"instance_url"` // Base URL of VCS instance
-	AccessToken   string `gorm:"not null" json:"-"` // API token (encrypted at rest)
-	WebhookSecret string `gorm:"not null" json:"-"` // For webhook signature validation
+	Provider      string `gorm:"not null" json:"provider"`         // "gitlab" | "github" | "gitea"
+	InstanceURL   string `gorm:"not null" json:"instance_url"`     // Base URL of VCS instance
+	AccessToken   string `gorm:"not null" json:"-"`                // API token (encrypted at rest)
+	WebhookSecret string `gorm:"not null" json:"-"`                // For webhook signature validation
 	Enabled       bool   `gorm:"default:true" json:"enabled"`
 }
 

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#MISE description="Build go CLI"
+
+set -e
+
+go build -o doc-thor

@@ -3,6 +3,10 @@ go = "latest"
 python = "latest"
 uv = "latest"
 
+[tasks]
+docs-build = { run = "uv run mkdocs build" }
+up-dev = { run = "docker compose -f deploy/docker-compose.dev.yml -f deploy/docker-compose.override.yml --env-file deploy/env/.env up --build" }
+cli = { run = "go run main.go", dir = "cli" }
 
-[tasks.docs-build]
-run = "uv run mkdocs build"
+[prepare]
+pip = { auto = true }

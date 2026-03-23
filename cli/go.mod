@@ -1,8 +1,6 @@
 module github.com/romain325/doc-thor/cli
 
-go 1.24.2
-
-toolchain go1.24.12
+go 1.26
 
 require (
 	github.com/charmbracelet/bubbles v0.21.1

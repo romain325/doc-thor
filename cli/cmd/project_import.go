@@ -25,17 +25,21 @@ var projectImportCmd = &cobra.Command{
 The webhook callback URL is auto-generated from your server config if not provided.
 
 Examples:
-  # Import all projects from a scope
+  # Import all projects from a GitLab scope
   doc-thor project import --integration company-gitlab --scope myteam/docs \
+    --register-webhook --auto-publish
+
+  # Import from a GitHub organization
+  doc-thor project import --integration github-cloud --scope myorg \
     --register-webhook --auto-publish
 
   # Import a single repository
   doc-thor project import --integration company-gitlab --repo myteam/docs/api-docs \
     --register-webhook
 
-  # Import with custom callback URL
-  doc-thor project import --integration company-gitlab --repo myteam/docs/api-docs \
-    --register-webhook --callback-url https://docs.example.com/api/v1/webhooks/gitlab/api-docs
+  # Import from GitHub with custom callback URL
+  doc-thor project import --integration github-cloud --repo myorg/documentation \
+    --register-webhook --callback-url https://docs.example.com/api/v1/webhooks/github/documentation
 
   # Import with custom branch mappings
   doc-thor project import --integration company-gitlab --repo myteam/docs/user-guide \

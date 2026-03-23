@@ -1,6 +1,6 @@
 # VCS Integration Design
 
-Self-hosted GitLab integration (and future GitHub, Gitea, etc.) for automated webhook-triggered builds and project discovery.
+GitLab and GitHub integration (and future Gitea, etc.) for automated webhook-triggered builds and project discovery.
 
 ---
 
@@ -606,10 +606,27 @@ func HandleWebhook(w http.ResponseWriter, r *http.Request) {
 
 ```bash
 # Add a GitLab instance
-doc-thor integration add gitlab \
+doc-thor integration create \
   --name company-gitlab \
+  --provider gitlab \
   --url https://gitlab.company.com \
   --token glpat-xxx \
+  --webhook-secret <secret>
+
+# Add GitHub.com
+doc-thor integration create \
+  --name github-cloud \
+  --provider github \
+  --url https://api.github.com \
+  --token ghp_xxx \
+  --webhook-secret <secret>
+
+# Add GitHub Enterprise
+doc-thor integration create \
+  --name github-enterprise \
+  --provider github \
+  --url https://github.company.com/api/v3 \
+  --token ghp_xxx \
   --webhook-secret <secret>
 
 # List integrations
@@ -619,7 +636,7 @@ doc-thor integration list
 doc-thor integration test company-gitlab
 
 # Remove integration
-doc-thor integration remove company-gitlab
+doc-thor integration delete company-gitlab
 ```
 
 ### Project Discovery
@@ -627,27 +644,36 @@ doc-thor integration remove company-gitlab
 ```bash
 # Discover projects in a GitLab group
 # Scans for repositories with .doc-thor.project.yaml
-doc-thor discover --integration company-gitlab --scope myteam/docs
+doc-thor discover company-gitlab myteam/docs
+
+# Discover projects in a GitHub organization
+doc-thor discover github-cloud myorg
 
 # Output:
 # Found 3 projects with .doc-thor.project.yaml:
 #   1. myteam/docs/api-docs (slug: api-docs, image: doc-thor/mkdocs-material:latest)
 #   2. myteam/docs/user-guide (slug: user-guide, image: doc-thor/mkdocs:latest)
 #   3. myteam/platform/admin-docs (slug: admin-docs, image: custom/sphinx:latest)
-#
-# Import project? [1-3, all, none]: 1
 
-# Import specific project
+# Import all discovered projects from GitLab scope
 doc-thor project import \
   --integration company-gitlab \
-  --repo myteam/docs/api-docs \
-  --branches main:latest,release/*:${branch} \
+  --scope myteam/docs \
+  --register-webhook \
   --auto-publish
+
+# Import specific GitHub repository
+doc-thor project import \
+  --integration github-cloud \
+  --repo myorg/documentation \
+  --register-webhook \
+  --branch-mapping main:latest:true \
+  --branch-mapping "v*:${tag}:true"
 
 # This will:
 # 1. Create project in doc-thor
-# 2. Register webhook on GitLab
-# 3. Trigger initial build for 'main' branch
+# 2. Register webhook on VCS platform (GitLab/GitHub)
+# 3. Trigger initial build for default branch
 ```
 
 ### Webhook Management
@@ -822,7 +848,7 @@ server/
 │   ├── gitlab/
 │   │   └── gitlab.go          # GitLab implementation
 │   ├── github/
-│   │   └── github.go          # GitHub implementation (future)
+│   │   └── github.go          # GitHub implementation
 │   └── gitea/
 │       └── gitea.go           # Gitea implementation (future)
 ├── routes/
@@ -859,10 +885,16 @@ server/
 - [ ] Add discovery API endpoint
 - [ ] CLI `discover` and `import` commands
 
-### Phase 4: GitHub/Gitea (future)
-- [ ] Implement `GitHubProvider`
+### Phase 4: GitHub Implementation
+- [x] Implement `GitHubProvider`
+- [x] Support GitHub.com and GitHub Enterprise
+- [x] Webhook validation using X-Hub-Signature-256
+- [x] Organization and user repository discovery
+- [x] Webhook registration and management
+
+### Phase 5: Gitea (future)
 - [ ] Implement `GiteaProvider`
-- [ ] Test provider-agnostic webhook flow
+- [ ] Test provider-agnostic webhook flow across all providers
 
 ---
 

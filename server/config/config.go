@@ -1,39 +1,61 @@
 package config
 
 import (
+	"context"
+	"github.com/sethvargo/go-envconfig"
+	"gopkg.in/yaml.v3"
+	"log"
+	"log/slog"
 	"os"
-	"strconv"
-	"strings"
 )
 
+type StorageConfig struct {
+	Endpoint  string `env:"STORAGE_ENDPOINT" yaml:"endpoint"`
+	AccessKey string `env:"STORAGE_ACCESS_KEY" yaml:"access_key"`
+	SecretKey string `env:"STORAGE_SECRET_KEY" yaml:"secret_key"`
+	UseSSL    bool   `env:"STORAGE_USE_SSL" yaml:"use_ssl"`
+}
+
 type Config struct {
-	Port             string
-	DatabaseURL      string
-	NginxConfigDir   string
-	StorageEndpoint  string
-	StorageAccessKey string
-	StorageSecretKey string
-	StorageUseSSL    bool
-	BuilderEndpoints []string
-	SessionTTLHours  int
-	InitialUser      string
-	InitialPassword  string
+	ConfigFile      string        `env:"DOCTHOR_CONFIG_FILE"`
+	Port            string        `env:"PORT" yaml:"port"`
+	DatabaseURL     string        `env:"DATABASE_URL" yaml:"database_url"`
+	NginxConfigDir  string        `env:"NGINX_CONFIG_DIR" yaml:"nginx_config_dir"`
+	StorageConfig   StorageConfig `yaml:"storage"`
+	SessionTTLHours int           `env:"SESSION_TTL_HOURS" yaml:"session_ttl_hours"`
+	InitialUser     string        `env:"INITIAL_USER" yaml:"initial_user"`
+	InitialPassword string        `env:"INITIAL_PASSWORD" yaml:"inital_password"`
 }
 
 func Load() Config {
-	return Config{
-		Port:             getEnv("PORT", "8080"),
-		DatabaseURL:      getEnv("DATABASE_URL", "./data.db"),
-		NginxConfigDir:   getEnv("NGINX_CONFIG_DIR", "/etc/nginx/sites-enabled"),
-		StorageEndpoint:  getEnv("STORAGE_ENDPOINT", ""),
-		StorageAccessKey: getEnv("STORAGE_ACCESS_KEY", ""),
-		StorageSecretKey: getEnv("STORAGE_SECRET_KEY", ""),
-		StorageUseSSL:    getEnvBool("STORAGE_USE_SSL", false),
-		BuilderEndpoints: getEnvList("BUILDER_ENDPOINTS"),
-		SessionTTLHours:  getEnvInt("SESSION_TTL_HOURS", 24),
-		InitialUser:      getEnv("INITIAL_USER", ""),
-		InitialPassword:  getEnv("INITIAL_PASSWORD", ""),
+	ctx := context.Background()
+	cfg := Config{
+		Port:           "8080",
+		DatabaseURL:    "./data.db",
+		NginxConfigDir: "/etc/nginx/sites-enabled",
+		StorageConfig: StorageConfig{
+			UseSSL: false,
+		},
+		SessionTTLHours: 24,
 	}
+
+	confFile, err := os.ReadFile(getEnv("DOCTHOR_CONFIG_FILE", "./config.yaml"))
+	if err != nil {
+		slog.Warn("No config file found", slog.Any("err", err))
+	} else {
+		if err := yaml.Unmarshal(confFile, &cfg); err != nil {
+			slog.Error("Error loading config file", slog.Any("err", err))
+		}
+	}
+
+	if err := envconfig.Process(ctx, &cfg); err != nil {
+		log.Fatal(err)
+	}
+
+	slog.Debug("Loaded Config", slog.Any("config", cfg))
+
+	return cfg
+
 }
 
 func getEnv(key, fallback string) string {
@@ -41,36 +63,4 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
-}
-
-func getEnvBool(key string, fallback bool) bool {
-	v, ok := os.LookupEnv(key)
-	if !ok {
-		return fallback
-	}
-	b, err := strconv.ParseBool(v)
-	if err != nil {
-		return fallback
-	}
-	return b
-}
-
-func getEnvInt(key string, fallback int) int {
-	v, ok := os.LookupEnv(key)
-	if !ok {
-		return fallback
-	}
-	i, err := strconv.Atoi(v)
-	if err != nil {
-		return fallback
-	}
-	return i
-}
-
-func getEnvList(key string) []string {
-	v, ok := os.LookupEnv(key)
-	if !ok || v == "" {
-		return nil
-	}
-	return strings.Split(v, ",")
 }

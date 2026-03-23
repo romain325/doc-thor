@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/romain325/doc-thor/server/config"
 	"github.com/romain325/doc-thor/server/services"
 	"gorm.io/gorm"
 )
@@ -27,7 +28,7 @@ func ListVersions(db *gorm.DB) http.HandlerFunc {
 	}
 }
 
-func UpdateVersion(db *gorm.DB, nginxDir, storageEndpoint string) http.HandlerFunc {
+func UpdateVersion(db *gorm.DB, nginxDir string, storage config.StorageConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		slug := chi.URLParam(r, "slug")
 		ver := chi.URLParam(r, "ver")
@@ -70,7 +71,7 @@ func UpdateVersion(db *gorm.DB, nginxDir, storageEndpoint string) http.HandlerFu
 		}
 
 		// best-effort nginx sync; non-fatal if it fails
-		services.SyncNginxConfig(db, project, nginxDir, storageEndpoint) //nolint:errcheck
+		services.SyncNginxConfig(db, project, nginxDir, storage.Endpoint) //nolint:errcheck
 
 		writeJSON(w, http.StatusOK, version)
 	}

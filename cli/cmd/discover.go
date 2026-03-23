@@ -16,7 +16,8 @@ var discoverCmd = &cobra.Command{
 
 Examples:
   doc-thor discover company-gitlab myteam/docs
-  doc-thor discover github-org mycompany`,
+  doc-thor discover github-cloud myorg
+  doc-thor discover github-enterprise mycompany`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		integrationName := args[0]

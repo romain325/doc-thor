@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -91,7 +92,8 @@ func extractBearer(r *http.Request) string {
 func validateToken(db *gorm.DB, raw string) (*models.User, error) {
 	hash := HashToken(raw)
 	var token models.Token
-	if err := db.Where("token_hash = ?", hash).First(&token).Error; err != nil {
+	if err := db.Where(&models.Token{TokenHash: hash}).First(&token).Error; err != nil {
+		slog.Debug("token not found", slog.Any("err", err))
 		return nil, ErrUnauthorized
 	}
 	if token.ExpiresAt != nil && token.ExpiresAt.Before(time.Now()) {
