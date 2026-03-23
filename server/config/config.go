@@ -27,6 +27,7 @@ type Config struct {
 	InitialPassword string        `env:"INITIAL_PASSWORD" yaml:"inital_password"`
 }
 
+// Conf priority: default -> config file -> env variables
 func Load() Config {
 	ctx := context.Background()
 	cfg := Config{
@@ -48,7 +49,10 @@ func Load() Config {
 		}
 	}
 
-	if err := envconfig.Process(ctx, &cfg); err != nil {
+	if err := envconfig.ProcessWith(ctx, &envconfig.Config{
+		Target:           &cfg,
+		DefaultOverwrite: true,
+	}); err != nil {
 		log.Fatal(err)
 	}
 

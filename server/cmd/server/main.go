@@ -20,9 +20,9 @@ func main() {
 	vcs.RegisterProvider(&gitlab.GitLabProvider{})
 	vcs.RegisterProvider(&github.GitHubProvider{})
 
+	config.ConfigureLogger()
 	cfg := config.Load()
 	db := config.PrepareDatabase(cfg)
-	config.ConfigureLogger()
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
