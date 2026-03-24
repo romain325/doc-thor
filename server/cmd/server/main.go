@@ -28,49 +28,46 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	// --- public ---
-	r.Get("/api/v1/health", routes.Health())
-	r.Post("/api/v1/auth/login", routes.Login(db, cfg.SessionTTLHours))
+	r.Route("/api/v1", func(r chi.Router) {
+		// --- public ---
+		r.Get("/health", routes.Health())
+		r.Post("/auth/login", routes.Login(db, cfg.SessionTTLHours))
 
-	// Webhooks (public - called by VCS platforms)
-	routes.RegisterWebhookRoutes(r, db)
+		// Webhooks (public - called by VCS platforms)
+		routes.RegisterWebhookRoutes(r, db)
 
-	// --- authenticated ---
-	r.Group(func(r chi.Router) {
-		r.Use(auth.RequireAuth(db))
+		// --- authenticated ---
+		r.Group(func(r chi.Router) {
+			r.Use(auth.RequireAuth(db))
 
-		// Projects
-		r.Post("/api/v1/projects", routes.CreateProject(db))
-		r.Get("/api/v1/projects", routes.ListProjects(db))
-		r.Get("/api/v1/projects/{slug}", routes.GetProject(db))
-		r.Put("/api/v1/projects/{slug}", routes.UpdateProject(db))
-		r.Delete("/api/v1/projects/{slug}", routes.DeleteProject(db))
+			routes.RegisterProjectRoutes(r, db)
+			// Builds
+			r.Post("/projects/{slug}/builds", routes.CreateBuild(db))
+			r.Get("/projects/{slug}/builds", routes.ListBuilds(db))
+			r.Get("/projects/{slug}/builds/{id}", routes.GetBuild(db))
 
-		// Builds
-		r.Post("/api/v1/projects/{slug}/builds", routes.CreateBuild(db))
-		r.Get("/api/v1/projects/{slug}/builds", routes.ListBuilds(db))
-		r.Get("/api/v1/projects/{slug}/builds/{id}", routes.GetBuild(db))
+			// Builder job endpoints
+			r.Get("/builds/pending", routes.ClaimPendingBuild(db))
+			r.Post("/builds/{id}/result", routes.ReportBuildResult(db))
 
-		// Builder job endpoints
-		r.Get("/api/v1/builds/pending", routes.ClaimPendingBuild(db))
-		r.Post("/api/v1/builds/{id}/result", routes.ReportBuildResult(db))
+			// Versions
+			r.Get("/projects/{slug}/versions", routes.ListVersions(db))
+			r.Put("/projects/{slug}/versions/{ver}", routes.UpdateVersion(db, cfg.NginxConfigDir, cfg.StorageConfig))
 
-		// Versions
-		r.Get("/api/v1/projects/{slug}/versions", routes.ListVersions(db))
-		r.Put("/api/v1/projects/{slug}/versions/{ver}", routes.UpdateVersion(db, cfg.NginxConfigDir, cfg.StorageConfig))
+			// Auth (key management + introspection)
+			r.Post("/auth/apikey", routes.CreateAPIKey(db))
+			r.Get("/auth/me", routes.GetMe(db))
 
-		// Auth (key management + introspection)
-		r.Post("/api/v1/auth/apikey", routes.CreateAPIKey(db))
-		r.Get("/api/v1/auth/me", routes.GetMe(db))
+			// System
+			r.Get("/backends", routes.Backends(cfg.StorageConfig))
 
-		// System
-		r.Get("/api/v1/backends", routes.Backends(cfg.StorageConfig))
+			// VCS Integrations
+			routes.RegisterVCSIntegrationRoutes(r, db)
 
-		// VCS Integrations
-		routes.RegisterVCSIntegrationRoutes(r, db)
+			// Project Discovery
+			routes.RegisterDiscoveryRoutes(r, db)
+		})
 
-		// Project Discovery
-		routes.RegisterDiscoveryRoutes(r, db)
 	})
 
 	slog.Info("doc-thor server listening", slog.String("port", cfg.Port))

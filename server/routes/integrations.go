@@ -13,7 +13,7 @@ import (
 
 // RegisterVCSIntegrationRoutes registers VCS integration routes.
 func RegisterVCSIntegrationRoutes(r chi.Router, db *gorm.DB) {
-	r.Route("/api/v1/integrations", func(r chi.Router) {
+	r.Route("/integrations", func(r chi.Router) {
 		r.Post("/", createVCSIntegration(db))
 		r.Get("/", listVCSIntegrations(db))
 		r.Route("/{name}", func(r chi.Router) {

@@ -11,6 +11,17 @@ import (
 	"gorm.io/gorm"
 )
 
+func RegisterProjectRoutes(r chi.Router, db *gorm.DB) {
+	r.Route("/projects", func(r chi.Router) {
+		r.Post("/", CreateProject(db))
+		r.Get("/", ListProjects(db))
+		r.Get("/{slug}", GetProject(db))
+		r.Put("/{slug}", UpdateProject(db))
+		r.Delete("/{slug}", DeleteProject(db))
+
+	})
+}
+
 func CreateProject(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var p models.Project

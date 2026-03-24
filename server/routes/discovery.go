@@ -11,8 +11,8 @@ import (
 
 // RegisterDiscoveryRoutes registers project discovery routes.
 func RegisterDiscoveryRoutes(r chi.Router, db *gorm.DB) {
-	r.Post("/api/v1/integrations/{name}/discover", discoverProjects(db))
-	r.Post("/api/v1/projects/import", importProject(db))
+	r.Post("/integrations/{name}/discover", discoverProjects(db))
+	r.Post("/projects/import", importProject(db))
 }
 
 func discoverProjects(db *gorm.DB) http.HandlerFunc {

@@ -15,7 +15,7 @@ import (
 
 // RegisterWebhookRoutes registers webhook routes.
 func RegisterWebhookRoutes(r chi.Router, db *gorm.DB) {
-	r.Post("/api/v1/webhooks/{provider}/{slug}", handleWebhook(db))
+	r.Post("/webhooks/{provider}/{slug}", handleWebhook(db))
 }
 
 func handleWebhook(db *gorm.DB) http.HandlerFunc {
@@ -107,10 +107,10 @@ func handleWebhook(db *gorm.DB) http.HandlerFunc {
 		// This would be handled by the build completion handler
 
 		writeJSON(w, http.StatusAccepted, map[string]interface{}{
-			"status":      "accepted",
-			"build_id":    build.ID,
-			"version_tag": versionTag,
-			"ref":         ref,
+			"status":       "accepted",
+			"build_id":     build.ID,
+			"version_tag":  versionTag,
+			"ref":          ref,
 			"auto_publish": matchedMapping.AutoPublish,
 		})
 	}
