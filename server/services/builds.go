@@ -80,8 +80,17 @@ func ReportBuildResult(db *gorm.DB, buildID uint, status, logs, errMsg string) (
 
 	// Successful build with a tag → publish the version immediately.
 	if status == "success" && b.Tag != "" {
-		if _, err := CreateVersion(db, b.ProjectID, b.ID, b.Tag); err != nil {
+		if version, err := CreateVersion(db, b.ProjectID, b.ID, b.Tag); err != nil {
 			return nil, err
+		} else if res, err := ListVersions(db, b.ProjectID); err != nil {
+			return nil, err
+		} else {
+			if len(res) == 1 {
+				isLatestUpdate := map[string]any{
+					"is_latest": true,
+				}
+				UpdateVersion(db, b.ProjectID, version.Tag, isLatestUpdate)
+			}
 		}
 	}
 
@@ -107,4 +116,3 @@ func GetBuild(db *gorm.DB, projectID, buildID uint) (*models.Build, error) {
 	}
 	return &b, nil
 }
-

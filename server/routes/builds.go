@@ -24,6 +24,7 @@ func CreateBuild(db *gorm.DB) http.HandlerFunc {
 			Ref string `json:"ref"`
 			Tag string `json:"tag"`
 		}
+		req.Tag = "latest"
 		// ref and tag are optional; ignore decode errors from empty bodies.
 		json.NewDecoder(r.Body).Decode(&req) //nolint:errcheck
 
