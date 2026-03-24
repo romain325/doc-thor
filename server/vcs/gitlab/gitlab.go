@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -85,7 +85,7 @@ func (p *GitLabProvider) ValidateWebhook(r *http.Request, secret string) (*vcs.E
 
 // DiscoverProjects scans the given scope and returns projects with .doc-thor.project.yaml.
 func (p *GitLabProvider) DiscoverProjects(ctx context.Context, config vcs.IntegrationConfig, scope string) ([]vcs.DiscoveredProject, error) {
-	log.Printf("[discovery] Starting GitLab project discovery in scope: %s", scope)
+	slog.Debug("starting GitLab project discovery", slog.String("scope", scope))
 
 	client, err := gitlab.NewClient(config.AccessToken, gitlab.WithBaseURL(config.InstanceURL))
 	if err != nil {
@@ -100,21 +100,21 @@ func (p *GitLabProvider) DiscoverProjects(ctx context.Context, config vcs.Integr
 	singleProject, singleErr := p.discoverSingleProject(ctx, client, scope, &checkedCount)
 	if singleErr == nil && len(singleProject) > 0 {
 		discovered = append(discovered, singleProject...)
-		log.Printf("[discovery] Discovery complete: checked %d repositories, found %d with .doc-thor.project.yaml", checkedCount, len(discovered))
+		slog.Debug("discovery complete", slog.Int("checked", checkedCount), slog.Int("found", len(discovered)))
 		return discovered, nil
 	}
 
-	log.Printf("[discovery] Single project discovery failed: %v. Trying group discovery...", singleErr)
+	slog.Warn("single project discovery failed, trying group discovery", slog.Any("err", singleErr))
 
 	// Try group discovery
 	groupProjects, groupErr := p.discoverGroupProjects(ctx, client, scope, &checkedCount)
 	if groupErr == nil {
 		discovered = append(discovered, groupProjects...)
-		log.Printf("[discovery] Discovery complete: checked %d repositories, found %d with .doc-thor.project.yaml", checkedCount, len(discovered))
+		slog.Debug("discovery complete", slog.Int("checked", checkedCount), slog.Int("found", len(discovered)))
 		return discovered, nil
 	}
 
-	log.Printf("[discovery] Group discovery failed: %v. Trying user namespace discovery...", groupErr)
+	slog.Warn("group discovery failed, trying user namespace discovery", slog.Any("err", groupErr))
 
 	// If group discovery fails, try user namespace discovery
 	userProjects, userErr := p.discoverUserProjects(ctx, client, scope, &checkedCount)
@@ -123,14 +123,14 @@ func (p *GitLabProvider) DiscoverProjects(ctx context.Context, config vcs.Integr
 	}
 
 	discovered = append(discovered, userProjects...)
-	log.Printf("[discovery] Discovery complete: checked %d repositories, found %d with .doc-thor.project.yaml", checkedCount, len(discovered))
+	slog.Debug("discovery complete", slog.Int("checked", checkedCount), slog.Int("found", len(discovered)))
 	return discovered, nil
 }
 
 // discoverSingleProject tries to fetch a single project by its full path.
 func (p *GitLabProvider) discoverSingleProject(ctx context.Context, client *gitlab.Client, projectPath string, checkedCount *int) ([]vcs.DiscoveredProject, error) {
 	*checkedCount++
-	log.Printf("[discovery] Checking single repository: %s", projectPath)
+	slog.Debug("checking single repository", slog.String("project", projectPath))
 
 	// Try to get the project by its path
 	proj, _, err := client.Projects.GetProject(projectPath, nil, gitlab.WithContext(ctx))
@@ -142,11 +142,11 @@ func (p *GitLabProvider) discoverSingleProject(ctx context.Context, client *gitl
 	hasDocThor, docThorConfig := p.checkForDocThor(ctx, client, proj)
 
 	if !hasDocThor {
-		log.Printf("[discovery]   ✗ No .doc-thor.project.yaml found")
+		slog.Debug("no .doc-thor.project.yaml found", slog.String("project", projectPath))
 		return nil, fmt.Errorf("project %s does not have .doc-thor.project.yaml", projectPath)
 	}
 
-	log.Printf("[discovery]   ✓ Found .doc-thor.project.yaml (slug: %s)", docThorConfig.Slug)
+	slog.Debug("found .doc-thor.project.yaml", slog.String("project", projectPath), slog.String("slug", docThorConfig.Slug))
 	return []vcs.DiscoveredProject{
 		{
 			Name:          proj.Name,
@@ -176,13 +176,13 @@ func (p *GitLabProvider) discoverGroupProjects(ctx context.Context, client *gitl
 
 		for _, proj := range projects {
 			*checkedCount++
-			log.Printf("[discovery] Checking repository [%d]: %s", *checkedCount, proj.PathWithNamespace)
+			slog.Debug("checking repository", slog.Int("index", *checkedCount), slog.String("project", proj.PathWithNamespace))
 
 			// Check if project has .doc-thor.project.yaml
 			hasDocThor, docThorConfig := p.checkForDocThor(ctx, client, proj)
 
 			if hasDocThor {
-				log.Printf("[discovery]   ✓ Found .doc-thor.project.yaml (slug: %s)", docThorConfig.Slug)
+				slog.Debug("found .doc-thor.project.yaml", slog.String("project", proj.PathWithNamespace), slog.String("slug", docThorConfig.Slug))
 				discovered = append(discovered, vcs.DiscoveredProject{
 					Name:          proj.Name,
 					Path:          proj.PathWithNamespace,
@@ -192,7 +192,7 @@ func (p *GitLabProvider) discoverGroupProjects(ctx context.Context, client *gitl
 					DocThorConfig: docThorConfig,
 				})
 			} else {
-				log.Printf("[discovery]   ✗ No .doc-thor.project.yaml found")
+				slog.Debug("no .doc-thor.project.yaml found", slog.String("project", proj.PathWithNamespace))
 			}
 		}
 
@@ -236,13 +236,13 @@ func (p *GitLabProvider) discoverUserProjects(ctx context.Context, client *gitla
 
 		for _, proj := range projects {
 			*checkedCount++
-			log.Printf("[discovery] Checking repository [%d]: %s", *checkedCount, proj.PathWithNamespace)
+			slog.Debug("checking repository", slog.Int("index", *checkedCount), slog.String("project", proj.PathWithNamespace))
 
 			// Check if project has .doc-thor.project.yaml
 			hasDocThor, docThorConfig := p.checkForDocThor(ctx, client, proj)
 
 			if hasDocThor {
-				log.Printf("[discovery]   ✓ Found .doc-thor.project.yaml (slug: %s)", docThorConfig.Slug)
+				slog.Debug("found .doc-thor.project.yaml", slog.String("project", proj.PathWithNamespace), slog.String("slug", docThorConfig.Slug))
 				discovered = append(discovered, vcs.DiscoveredProject{
 					Name:          proj.Name,
 					Path:          proj.PathWithNamespace,
@@ -252,7 +252,7 @@ func (p *GitLabProvider) discoverUserProjects(ctx context.Context, client *gitla
 					DocThorConfig: docThorConfig,
 				})
 			} else {
-				log.Printf("[discovery]   ✗ No .doc-thor.project.yaml found")
+				slog.Debug("no .doc-thor.project.yaml found", slog.String("project", proj.PathWithNamespace))
 			}
 		}
 
@@ -277,33 +277,34 @@ func (p *GitLabProvider) checkForDocThor(ctx context.Context, client *gitlab.Cli
 
 	if err != nil {
 		// File doesn't exist or other error
-		log.Printf("[discovery]   File read error: %v", err)
+		slog.Debug("file read error", slog.String("project", proj.PathWithNamespace), slog.Any("err", err))
 		return false, nil
 	}
 
 	// Decode base64 content
 	content, err := base64.StdEncoding.DecodeString(file.Content)
 	if err != nil {
-		log.Printf("[discovery]   Base64 decode error: %v", err)
+		slog.Debug("base64 decode error", slog.String("project", proj.PathWithNamespace), slog.Any("err", err))
 		return false, nil
 	}
 
-	log.Printf("[discovery]   File content:\n%s", string(content))
+	slog.Debug("file content fetched", slog.String("project", proj.PathWithNamespace), slog.String("content", string(content)))
 
 	// Parse YAML
 	var config vcs.DocThorConfig
 	if err := yaml.Unmarshal(content, &config); err != nil {
 		// Invalid YAML - log but don't fail discovery
-		log.Printf("[discovery]   YAML parse error: %v", err)
+		slog.Debug("YAML parse error", slog.String("project", proj.PathWithNamespace), slog.Any("err", err))
 		return false, nil
 	}
 
-	log.Printf("[discovery]   Parsed config: slug=%q, name=%q, docker_image=%q, branch_mappings=%d",
-		config.Slug, config.Name, config.DockerImage, len(config.BranchMappings))
+	slog.Debug("parsed config", slog.String("project", proj.PathWithNamespace),
+		slog.String("slug", config.Slug), slog.String("name", config.Name),
+		slog.String("docker_image", config.DockerImage), slog.Int("branch_mappings", len(config.BranchMappings)))
 
 	// Validate required fields
 	if config.Slug == "" || config.Name == "" || config.DockerImage == "" {
-		log.Printf("[discovery]   Validation failed: missing required fields")
+		slog.Debug("validation failed: missing required fields", slog.String("project", proj.PathWithNamespace))
 		return false, nil
 	}
 

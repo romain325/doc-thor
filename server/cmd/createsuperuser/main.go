@@ -3,7 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/romain325/doc-thor/server/auth"
@@ -26,7 +26,8 @@ func main() {
 
 	db, err := gorm.Open(sqlite.Open(cfg.DatabaseURL), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("failed to open database: %v", err)
+		slog.Error("failed to open database", slog.Any("err", err))
+		os.Exit(1)
 	}
 
 	db.Exec("PRAGMA journal_mode=WAL")
@@ -34,19 +35,23 @@ func main() {
 	sqlDB.SetMaxOpenConns(1)
 
 	if err := db.AutoMigrate(&models.User{}); err != nil {
-		log.Fatalf("failed to migrate: %v", err)
+		slog.Error("failed to migrate", slog.Any("err", err))
+		os.Exit(1)
 	}
 
 	var existing models.User
 	if err := db.Where("username = ?", username).First(&existing).Error; err == nil {
-		log.Fatalf("user %q already exists", username)
+		slog.Error("user already exists", slog.String("username", username))
+		os.Exit(1)
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		log.Fatalf("failed to query user: %v", err)
+		slog.Error("failed to query user", slog.Any("err", err))
+		os.Exit(1)
 	}
 
 	hash, err := auth.HashPassword(password)
 	if err != nil {
-		log.Fatalf("failed to hash password: %v", err)
+		slog.Error("failed to hash password", slog.Any("err", err))
+		os.Exit(1)
 	}
 
 	user := models.User{
@@ -55,7 +60,8 @@ func main() {
 		IsSuperuser:  true,
 	}
 	if err := db.Create(&user).Error; err != nil {
-		log.Fatalf("failed to create superuser: %v", err)
+		slog.Error("failed to create superuser", slog.Any("err", err))
+		os.Exit(1)
 	}
 
 	fmt.Printf("superuser %q created (id=%d)\n", username, user.ID)

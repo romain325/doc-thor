@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/sethvargo/go-envconfig"
 	"gopkg.in/yaml.v3"
-	"log"
 	"log/slog"
 	"os"
 )
@@ -53,7 +52,8 @@ func Load() Config {
 		Target:           &cfg,
 		DefaultOverwrite: true,
 	}); err != nil {
-		log.Fatal(err)
+		slog.Error("failed to process environment config", slog.Any("err", err))
+		os.Exit(1)
 	}
 
 	slog.Debug("Loaded Config", slog.Any("config", cfg))

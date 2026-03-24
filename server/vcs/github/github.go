@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -91,8 +91,8 @@ func (p *GitHubProvider) ValidateWebhook(r *http.Request, secret string) (*vcs.E
 	} else if eventType == "create" {
 		// Handle tag creation events
 		var payload struct {
-			RefType string `json:"ref_type"`
-			Ref     string `json:"ref"`
+			RefType    string `json:"ref_type"`
+			Ref        string `json:"ref"`
 			Repository struct {
 				FullName string `json:"full_name"`
 			} `json:"repository"`
@@ -120,7 +120,7 @@ func (p *GitHubProvider) ValidateWebhook(r *http.Request, secret string) (*vcs.E
 
 // DiscoverProjects scans the given scope and returns projects with .doc-thor.project.yaml.
 func (p *GitHubProvider) DiscoverProjects(ctx context.Context, config vcs.IntegrationConfig, scope string) ([]vcs.DiscoveredProject, error) {
-	log.Printf("[discovery] Starting GitHub project discovery in scope: %s", scope)
+	slog.Debug("starting GitHub project discovery", slog.String("scope", scope))
 
 	client := github.NewClient(nil).WithAuthToken(config.AccessToken)
 	if config.InstanceURL != "" && config.InstanceURL != "https://api.github.com" {
@@ -139,21 +139,21 @@ func (p *GitHubProvider) DiscoverProjects(ctx context.Context, config vcs.Integr
 	singleRepo, singleErr := p.discoverSingleRepository(ctx, client, scope, &checkedCount)
 	if singleErr == nil && len(singleRepo) > 0 {
 		discovered = append(discovered, singleRepo...)
-		log.Printf("[discovery] Discovery complete: checked %d repositories, found %d with .doc-thor.project.yaml", checkedCount, len(discovered))
+		slog.Debug("discovery complete", slog.Int("checked", checkedCount), slog.Int("found", len(discovered)))
 		return discovered, nil
 	}
 
-	log.Printf("[discovery] Single repository discovery failed: %v. Trying organization discovery...", singleErr)
+	slog.Warn("single repository discovery failed, trying organization discovery", slog.Any("err", singleErr))
 
 	// Try organization discovery
 	orgRepos, orgErr := p.discoverOrganizationRepositories(ctx, client, scope, &checkedCount)
 	if orgErr == nil {
 		discovered = append(discovered, orgRepos...)
-		log.Printf("[discovery] Discovery complete: checked %d repositories, found %d with .doc-thor.project.yaml", checkedCount, len(discovered))
+		slog.Debug("discovery complete", slog.Int("checked", checkedCount), slog.Int("found", len(discovered)))
 		return discovered, nil
 	}
 
-	log.Printf("[discovery] Organization discovery failed: %v. Trying user discovery...", orgErr)
+	slog.Warn("organization discovery failed, trying user discovery", slog.Any("err", orgErr))
 
 	// If organization discovery fails, try user repository discovery
 	userRepos, userErr := p.discoverUserRepositories(ctx, client, scope, &checkedCount)
@@ -162,14 +162,14 @@ func (p *GitHubProvider) DiscoverProjects(ctx context.Context, config vcs.Integr
 	}
 
 	discovered = append(discovered, userRepos...)
-	log.Printf("[discovery] Discovery complete: checked %d repositories, found %d with .doc-thor.project.yaml", checkedCount, len(discovered))
+	slog.Debug("discovery complete", slog.Int("checked", checkedCount), slog.Int("found", len(discovered)))
 	return discovered, nil
 }
 
 // discoverSingleRepository tries to fetch a single repository by its full path.
 func (p *GitHubProvider) discoverSingleRepository(ctx context.Context, client *github.Client, repoPath string, checkedCount *int) ([]vcs.DiscoveredProject, error) {
 	*checkedCount++
-	log.Printf("[discovery] Checking single repository: %s", repoPath)
+	slog.Debug("checking single repository", slog.String("repo", repoPath))
 
 	// Split owner/repo
 	parts := strings.Split(repoPath, "/")
@@ -188,11 +188,11 @@ func (p *GitHubProvider) discoverSingleRepository(ctx context.Context, client *g
 	hasDocThor, docThorConfig := p.checkForDocThor(ctx, client, repository)
 
 	if !hasDocThor {
-		log.Printf("[discovery]   ✗ No .doc-thor.project.yaml found")
+		slog.Debug("no .doc-thor.project.yaml found", slog.String("repo", repoPath))
 		return nil, fmt.Errorf("repository %s does not have .doc-thor.project.yaml", repoPath)
 	}
 
-	log.Printf("[discovery]   ✓ Found .doc-thor.project.yaml (slug: %s)", docThorConfig.Slug)
+	slog.Debug("found .doc-thor.project.yaml", slog.String("repo", repoPath), slog.String("slug", docThorConfig.Slug))
 	return []vcs.DiscoveredProject{
 		{
 			Name:          repository.GetName(),
@@ -221,13 +221,13 @@ func (p *GitHubProvider) discoverOrganizationRepositories(ctx context.Context, c
 
 		for _, repo := range repos {
 			*checkedCount++
-			log.Printf("[discovery] Checking repository [%d]: %s", *checkedCount, repo.GetFullName())
+			slog.Debug("checking repository", slog.Int("index", *checkedCount), slog.String("repo", repo.GetFullName()))
 
 			// Check if repository has .doc-thor.project.yaml
 			hasDocThor, docThorConfig := p.checkForDocThor(ctx, client, repo)
 
 			if hasDocThor {
-				log.Printf("[discovery]   ✓ Found .doc-thor.project.yaml (slug: %s)", docThorConfig.Slug)
+				slog.Debug("found .doc-thor.project.yaml", slog.String("repo", repo.GetFullName()), slog.String("slug", docThorConfig.Slug))
 				discovered = append(discovered, vcs.DiscoveredProject{
 					Name:          repo.GetName(),
 					Path:          repo.GetFullName(),
@@ -237,7 +237,7 @@ func (p *GitHubProvider) discoverOrganizationRepositories(ctx context.Context, c
 					DocThorConfig: docThorConfig,
 				})
 			} else {
-				log.Printf("[discovery]   ✗ No .doc-thor.project.yaml found")
+				slog.Debug("no .doc-thor.project.yaml found", slog.String("repo", repo.GetFullName()))
 			}
 		}
 
@@ -267,13 +267,13 @@ func (p *GitHubProvider) discoverUserRepositories(ctx context.Context, client *g
 
 		for _, repo := range repos {
 			*checkedCount++
-			log.Printf("[discovery] Checking repository [%d]: %s", *checkedCount, repo.GetFullName())
+			slog.Debug("checking repository", slog.Int("index", *checkedCount), slog.String("repo", repo.GetFullName()))
 
 			// Check if repository has .doc-thor.project.yaml
 			hasDocThor, docThorConfig := p.checkForDocThor(ctx, client, repo)
 
 			if hasDocThor {
-				log.Printf("[discovery]   ✓ Found .doc-thor.project.yaml (slug: %s)", docThorConfig.Slug)
+				slog.Debug("found .doc-thor.project.yaml", slog.String("repo", repo.GetFullName()), slog.String("slug", docThorConfig.Slug))
 				discovered = append(discovered, vcs.DiscoveredProject{
 					Name:          repo.GetName(),
 					Path:          repo.GetFullName(),
@@ -283,7 +283,7 @@ func (p *GitHubProvider) discoverUserRepositories(ctx context.Context, client *g
 					DocThorConfig: docThorConfig,
 				})
 			} else {
-				log.Printf("[discovery]   ✗ No .doc-thor.project.yaml found")
+				slog.Debug("no .doc-thor.project.yaml found", slog.String("repo", repo.GetFullName()))
 			}
 		}
 
@@ -301,7 +301,7 @@ func (p *GitHubProvider) checkForDocThor(ctx context.Context, client *github.Cli
 	// Split owner/repo
 	parts := strings.Split(repo.GetFullName(), "/")
 	if len(parts) != 2 {
-		log.Printf("[discovery]   Invalid repository path: %s", repo.GetFullName())
+		slog.Debug("invalid repository path", slog.String("repo", repo.GetFullName()))
 		return false, nil
 	}
 	owner, repoName := parts[0], parts[1]
@@ -317,33 +317,34 @@ func (p *GitHubProvider) checkForDocThor(ctx context.Context, client *github.Cli
 
 	if err != nil {
 		// File doesn't exist or other error
-		log.Printf("[discovery]   File read error: %v", err)
+		slog.Debug("file read error", slog.String("repo", repo.GetFullName()), slog.Any("err", err))
 		return false, nil
 	}
 
 	// Decode content
 	content, err := fileContent.GetContent()
 	if err != nil {
-		log.Printf("[discovery]   Content decode error: %v", err)
+		slog.Debug("content decode error", slog.String("repo", repo.GetFullName()), slog.Any("err", err))
 		return false, nil
 	}
 
-	log.Printf("[discovery]   File content:\n%s", content)
+	slog.Debug("file content fetched", slog.String("repo", repo.GetFullName()), slog.String("content", content))
 
 	// Parse YAML
 	var config vcs.DocThorConfig
 	if err := yaml.Unmarshal([]byte(content), &config); err != nil {
 		// Invalid YAML - log but don't fail discovery
-		log.Printf("[discovery]   YAML parse error: %v", err)
+		slog.Debug("YAML parse error", slog.String("repo", repo.GetFullName()), slog.Any("err", err))
 		return false, nil
 	}
 
-	log.Printf("[discovery]   Parsed config: slug=%q, name=%q, docker_image=%q, branch_mappings=%d",
-		config.Slug, config.Name, config.DockerImage, len(config.BranchMappings))
+	slog.Debug("parsed config", slog.String("repo", repo.GetFullName()),
+		slog.String("slug", config.Slug), slog.String("name", config.Name),
+		slog.String("docker_image", config.DockerImage), slog.Int("branch_mappings", len(config.BranchMappings)))
 
 	// Validate required fields
 	if config.Slug == "" || config.Name == "" || config.DockerImage == "" {
-		log.Printf("[discovery]   Validation failed: missing required fields")
+		slog.Debug("validation failed: missing required fields", slog.String("repo", repo.GetFullName()))
 		return false, nil
 	}
 
