@@ -14,7 +14,7 @@ be patient.
 
 ```shell
 # Up ssh agent for builder repo pull
-eval $(ssh-agent -s)
+eval $(ssh-agent -s) //or use default gnupg ssh-agent it will add it to .gnupg/sshcontrol
 ssh-add ~/.ssh/id_ed25519
 ```
 
