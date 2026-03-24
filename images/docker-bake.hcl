@@ -3,7 +3,7 @@ variable "TAG" {
 }
 
 group "default" {
-  targets = ["builder-mkdocs"]
+  targets = ["builder-mkdocs", "builder-vitepress"]
 }
 
 target "builder-mkdocs" {
@@ -14,6 +14,19 @@ target "builder-mkdocs" {
     "oci.opencontainers.image.url=https://github.com/romain325/doc-thor/tree/main/images/mkdocs-material",
     "oci.opencontainers.image.documentation=https://github.com/romain325/doc-thor/tree/main/images/mkdocs-material/README.md",
     "oci.opencontainers.image.description=Builder to generate mkdocs material based static website that can be handled by doc-thor",
+    "oci.opencontainers.image.authors=kelkchoz",
+    "oci.opencontainers.image.version=${TAG}"
+  ]
+}
+
+target "builder-vitepress" {
+  context = "./vitepress/"
+  tags    = ["romain325/doc-thor-builder-vitepress:${TAG}"]
+  annotations = [
+    "oci.opencontainers.image.title=doc-thor vitePress builder",
+    "oci.opencontainers.image.url=https://github.com/romain325/doc-thor/tree/main/images/vitepress",
+    "oci.opencontainers.image.documentation=https://github.com/romain325/doc-thor/tree/main/images/vitepress/README.md",
+    "oci.opencontainers.image.description=Builder to generate vitepress based static website that can be handled by doc-thor",
     "oci.opencontainers.image.authors=kelkchoz",
     "oci.opencontainers.image.version=${TAG}"
   ]

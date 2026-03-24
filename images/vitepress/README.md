@@ -1,6 +1,6 @@
-# romain325/doc-thor-builder-mkdocs
+# romain325/doc-thor-builder-vuepress
 
-Official doc-thor image for [MkDocs](https://www.mkdocs.org/) projects. Includes the [Material theme](https://squidfunk.github.io/mkdocs-material/).
+Official doc-thor image for [VuePress](https://vuepress.vuejs.org/) projects.
 
 ## Container contract
 
@@ -8,16 +8,10 @@ All doc-thor build images follow the same interface with the builder:
 
 | Mount     | Mode       | Purpose                                            |
 | --------- | ---------- | -------------------------------------------------- |
-| `/repo`   | read-only  | Cloned source repository (contains `mkdocs.yml`)   |
+| `/repo`   | read-only  | Cloned source repository                           |
 | `/output` | read-write | Build output — collected by the builder after exit |
 
 Exit code `0` signals success. Anything else is a failure.
-
-## Build
-
-```sh
-docker build -t doc-thor/builder-mkdocs .
-```
 
 ## Test locally
 
@@ -25,7 +19,7 @@ docker build -t doc-thor/builder-mkdocs .
 docker run --rm \
   -v $(pwd)/path/to/docs:/repo:ro \
   -v /tmp/out:/output \
-  romain325/doc-thor-builder-mkdocs
+  romain325/doc-thor-builder-vuepress
 ```
 
 Output will appear in `/tmp/out`.
@@ -35,7 +29,6 @@ Output will appear in `/tmp/out`.
 Need extra plugins? Create a new image that extends this one:
 
 ```dockerfile
-FROM romain325/doc-thor-builder-mkdocs
+FROM romain325/doc-thor-builder-vuepress
 
-RUN pip install --no-cache-dir mkdocs-git-revision-date-plugin
 ```
