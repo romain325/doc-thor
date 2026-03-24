@@ -1,0 +1,13 @@
+slug: doc-thor-imported
+name: doc-thor-imported
+docker_image: doc-thor/mkdocs-material:latest
+branch_mappings:
+  - branch: main
+    version_tag: latest
+    auto_publish: true
+  - branch: "v*"
+    version_tag: "${tag}"
+    auto_publish: true
+  - branch: "release/*"
+    version_tag: "${branch}"
+    auto_publish: false
